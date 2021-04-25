@@ -1,0 +1,57 @@
+---
+image:
+    name: hashicorp/terraform
+    entrypoint: ["/bin/sh", "-c"]
+
+before_script:
+  - terraform init
+
+stages:
+  - validate
+  - refresh
+  - plan
+  - apply
+
+validate:
+  stage: validate
+  script:
+    - terraform validate
+  only:
+    refs:
+      - master
+
+refresh:
+  stage: refresh
+  script:
+    - terraform refresh -var="ssm_webhook_signing_key_value=${ssm_webhook_signing_key}"
+  allow_failure: true
+  dependencies:
+    - validate
+  only:
+    refs:
+      - master
+
+plan:
+  stage: plan
+  script:
+    - terraform plan -var="ssm_webhook_signing_key_value=${ssm_webhook_signing_key}" -out "plan.ignore"
+  dependencies:
+    - refresh
+  only:
+    refs:
+      - master
+  artifacts:
+    paths:
+      - plan.ignore
+
+apply:
+  stage: apply
+  script:
+    - terraform apply "plan.ignore"
+  allow_failure: false
+  only:
+    refs:
+      - master
+  dependencies:
+    - plan
+  when: manual
